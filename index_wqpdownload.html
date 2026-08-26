@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WQP Polygon Download — New Mexico</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root {
+    --page: #f6f7f5; --surface-1: #ffffff; --ink-1: #1c231f; --ink-2: #4b564e;
+    --muted: #7c8a7f; --border: #d9e0da; --grid: #e7ece7; --wash: #eef2ee;
+    --accent: #2f6f4f; --accent-ink: #ffffff; --draw: #ff6600;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink-1); background: var(--page); display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: var(--surface-1); border-bottom: 1px solid var(--border); flex: 0 0 auto; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; font-weight: 700; margin: 0; white-space: nowrap; }
+  header .sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .spacer { flex: 1; }
+  button {
+    font: inherit; border: 1px solid var(--border); background: var(--surface-1); color: var(--ink-1);
+    border-radius: 6px; padding: 6px 10px; cursor: pointer;
+  }
+  button:hover { background: var(--wash); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  .draw-filter-btn {
+    font-size: 14px; font-weight: 700; padding: 9px 18px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  button.small { padding: 4px 8px; font-size: 12px; }
+  #drawControls { display: none; gap: 6px; align-items: center; }
+  #editControls { display: none; gap: 6px; align-items: center; }
+  .site-type-popover {
+    position: absolute; top: 34px; left: 0; z-index: 950; width: 240px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.14); padding: 10px 12px; font-size: 12.5px;
+  }
+  .stp-actions { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .stp-link, .legend-link {
+    border: none; background: none; padding: 0; font: inherit; font-size: 11.5px;
+    color: var(--accent); cursor: pointer; text-decoration: underline;
+  }
+  .stp-sep { color: var(--muted); font-size: 11px; }
+  .stp-group-label { font-weight: 700; color: var(--ink-2); margin: 8px 0 4px; }
+  .stp-group-label:first-child { margin-top: 0; }
+  .stp-note { font-weight: 400; color: var(--muted); }
+  .stp-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; }
+  .stp-row input { margin: 0; }
+  .legend-panel {
+    position: absolute; top: 14px; left: 14px; z-index: 890; width: 300px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.12); overflow: hidden;
+  }
+  .legend-handle {
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: move;
+    background: var(--wash); border-bottom: 1px solid var(--border); user-select: none; touch-action: none;
+  }
+  .legend-drag-dots { color: var(--muted); font-size: 13px; letter-spacing: -1px; }
+  .legend-title { font-size: 12.5px; font-weight: 700; color: var(--ink-1); }
+  .legend-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  .legend-note { font-size: 10.5px; color: var(--muted); padding: 6px 10px 0; }
+  .legend-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; row-gap: 3px; padding: 8px 10px 10px; }
+  .legend-row { display: flex; align-items: center; gap: 5px; font-size: 11.5px; min-width: 0; cursor: pointer; padding: 1px 0; }
+  .legend-row input[type="checkbox"] { margin: 0; flex: 0 0 auto; }
+  .legend-swatch { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .legend-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+  .legend-count { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .vertex-handle {
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    border: 2.5px solid var(--draw); box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: grab;
+  }
+  .vertex-handle:active { cursor: grabbing; }
+  .midpoint-handle {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--draw); opacity: .55;
+    border: 1.5px solid #fff; cursor: copy; transition: transform .1s ease, opacity .1s ease;
+  }
+  .midpoint-handle:hover { opacity: 1; transform: scale(1.3); }
+  #mapWrap { position: relative; flex: 1; min-height: 0; }
+  #map { position: absolute; inset: 0; }
+  #panel {
+    position: absolute; top: 14px; right: 14px; z-index: 900; width: 270px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.12); padding: 12px 14px;
+  }
+  #panel h2 { font-size: 13px; margin: 0 0 8px; font-weight: 700; }
+  .stat-row { display: flex; align-items: baseline; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .stat-row .v { font-weight: 700; }
+  .stat-row .k { color: var(--muted); }
+  #panel .hint { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+  #downloadBtn { width: 100%; margin-top: 10px; }
+  #clearFilterLink { display: block; text-align: center; margin-top: 8px; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; background: none; border: none; width: 100%; }
+  #loadingBadge { display: none; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #loadingBadge.show { display: flex; }
+  .date-range-row { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--border); }
+  .date-range-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 5px; }
+  .date-range-inputs { display: flex; align-items: center; gap: 6px; }
+  .date-range-inputs input[type="date"] {
+    font: inherit; font-size: 12px; border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 6px; color: var(--ink-1); background: var(--surface-1); flex: 1 1 0; min-width: 0;
+  }
+  .date-range-sep { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; }
+  .param-summary-row { margin: 10px 0; padding-top: 8px; border-top: 1px solid var(--border); }
+  .param-meta { font-size: 11px; color: var(--muted); margin: 6px 0; }
+  .param-empty { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .param-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; row-gap: 3px; margin-top: 4px; }
+  .param-row { display: flex; align-items: center; gap: 5px; font-size: 11.5px; min-width: 0; }
+  .param-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+  .param-count { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--grid); border-top-color: var(--accent); animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 12px);
+    background: var(--ink-1); color: #fff; padding: 9px 14px; border-radius: 8px;
+    font-size: 12.5px; max-width: 480px; opacity: 0; pointer-events: none; transition: all .18s ease; z-index: 2000;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  table.attrs { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.attrs td { border-bottom: 1px solid var(--grid); padding: 3px 6px; vertical-align: top; word-break: break-word; }
+  table.attrs td:first-child { color: var(--ink-2); white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  table.attrs td a { color: var(--accent); }
+  .popup-links { margin-top: 6px; display: flex; gap: 10px; font-size: 12px; }
+  .leaflet-popup-content { max-height: 240px; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WQP Polygon Download</h1>
+  <span class="sub">Water Quality Portal · New Mexico monitoring locations</span>
+  <span class="spacer"></span>
+  <button id="drawFilterBtn" class="primary draw-filter-btn" title="Draw a polygon on the map to select monitoring locations inside it">⬠ Draw a filter</button>
+  <span id="drawControls">
+    <button id="drawFinishBtn" class="small" disabled>Finish</button>
+    <button id="drawUndoBtn" class="small" disabled>Undo point</button>
+    <button id="drawCancelBtn" class="small">Cancel</button>
+  </span>
+  <span id="editControls">
+    <button id="editToggleBtn" class="small">✓ Done editing</button>
+  </span>
+  <span class="spacer"></span>
+  <span style="position:relative;">
+    <button id="basemapBtn" title="Switch the map background">🗺 Basemap</button>
+    <div id="basemapPopover" class="site-type-popover" style="display:none; width:170px;">
+      <div id="basemapList"></div>
+    </div>
+  </span>
+  <span style="position:relative;">
+    <button id="siteTypeBtn" title="Choose which kinds of sites to show">⚙ Site types</button>
+    <div id="siteTypePopover" class="site-type-popover" style="display:none">
+      <div class="stp-actions">
+        <button type="button" id="siteTypeAllBtn" class="stp-link">Select all</button>
+        <span class="stp-sep">·</span>
+        <button type="button" id="siteTypeNoneBtn" class="stp-link">Select none</button>
+      </div>
+      <div class="stp-group-label">Water sites</div>
+      <div id="siteTypeWaterList"></div>
+      <div class="stp-group-label">Other sites</div>
+      <div id="siteTypeOtherList"></div>
+    </div>
+  </span>
+</header>
+
+<div id="mapWrap">
+  <div id="map"></div>
+  <div id="panel">
+    <h2>Monitoring locations</h2>
+    <div class="stat-row"><span class="k">In current view</span><span class="v" id="statTotal">—</span></div>
+    <div class="stat-row" id="statFilteredRow" style="display:none"><span class="k">Inside filter</span><span class="v" id="statFiltered">—</span></div>
+    <div id="loadingBadge"><span class="spin"></span> Loading stations…</div>
+    <div class="date-range-row">
+      <label class="date-range-label" for="dateFromInput">Date range <span class="stp-note">(optional, applies to downloads)</span></label>
+      <div class="date-range-inputs">
+        <input type="date" id="dateFromInput" aria-label="From date">
+        <span class="date-range-sep">to</span>
+        <input type="date" id="dateToInput" aria-label="To date">
+        <button type="button" id="dateRangeClearBtn" class="legend-link" title="Clear date range">Clear</button>
+      </div>
+    </div>
+    <div class="param-summary-row">
+      <button type="button" id="loadParamsBtn" class="small" style="width:100%;">📊 Show available parameters</button>
+      <div id="paramSummaryResults"></div>
+    </div>
+    <button id="downloadBtn" class="primary" style="display:none">⬇ Download results (CSV)</button>
+    <button id="stopStreamBtn" class="small" style="display:none;width:100%;margin-top:6px;">■ Stop &amp; save what's downloaded</button>
+    <button id="clearFilterLink" style="display:none">Clear filter</button>
+    <div class="hint" id="hintText">Pan and zoom to load stations for the visible area. Draw a polygon (Finish or double-click to close) to select a subset, then download all of their water-sample results as one CSV.</div>
+  </div>
+  <div id="legendPanel" class="legend-panel" style="display:none">
+    <div id="legendHandle" class="legend-handle">
+      <span class="legend-drag-dots">⠿</span>
+      <span class="legend-title">Site types</span>
+      <span class="legend-actions">
+        <button type="button" id="legendAllBtn" class="legend-link">All</button><span class="stp-sep">·</span><button type="button" id="legendNoneBtn" class="legend-link">None</button>
+      </span>
+    </div>
+    <div class="legend-note">Uncheck to hide from the map and exclude from downloads</div>
+    <div id="legendGrid" class="legend-grid"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+'use strict';
+
+// WQP's site types aren't hard-coded or fetched from a separate lookup
+// endpoint (that was fragile — a mismatched/misparsed value there caused
+// every query using it to 400, and once results narrowed to a query with a
+// too-small known-type list, other types could vanish from the UI with no
+// way back). Instead we discover real values directly from an unfiltered
+// station query the first time one succeeds (see discoverSiteTypesFrom) —
+// every discovered value is guaranteed to be one WQP itself just returned,
+// so there's no guessing and nothing else to fail.
+let WQP_WATER_SITE_TYPES = [];
+let WQP_OTHER_SITE_TYPES = [];
+const WQP_OTHER_SITE_TYPE_NAMES = new Set(['atmosphere', 'facility', 'land']);
+function discoverSiteTypesFrom(features) {
+  const seen = new Set();
+  for (const f of features) {
+    const t = siteTypeOf(f);
+    if (t && t !== 'Unknown') seen.add(t);
+  }
+  for (const t of seen) {
+    const bucket = WQP_OTHER_SITE_TYPE_NAMES.has(t.toLowerCase()) ? WQP_OTHER_SITE_TYPES : WQP_WATER_SITE_TYPES;
+    if (!bucket.includes(t)) bucket.push(t);
+  }
+  return seen.size > 0;
+}
+// Distinct, legend-friendly colors per WQP site type. Anything not in this
+// map (new/unlisted types) falls back to __default so the app never breaks
+// if WQP adds a category.
+const SITE_TYPE_COLORS = {
+  'Stream': '#1f77b4',
+  'Lake, Reservoir, Impoundment': '#17becf',
+  'Spring': '#2ca02c',
+  'Well': '#8c564b',
+  'Wetland': '#00897b',
+  'Estuary': '#9467bd',
+  'Ocean': '#0b3d91',
+  'Glacier': '#5bc8e2',
+  'Subsurface': '#5d4037',
+  'Aggregate surface-water-use': '#3f51b5',
+  'Aggregate groundwater-use': '#607d8b',
+  'Atmosphere': '#ff7f0e',
+  'Facility': '#e377c2',
+  'Land': '#a3a825',
+  __default: '#999999',
+};
+function siteTypeOf(feature) {
+  const p = (feature && feature.properties) || {};
+  return p.MonitoringLocationTypeName || 'Unknown';
+}
+function colorForSiteType(type) { return SITE_TYPE_COLORS[type] || SITE_TYPE_COLORS.__default; }
+
+/* ============================== state ============================== */
+const state = {
+  map: null,
+  layer: null,
+  basemapLayer: null,
+  basemapId: 'topo',
+  dateFrom: '', // YYYY-MM-DD from <input type=date>, or '' for no lower bound
+  dateTo: '',   // YYYY-MM-DD, or '' for no upper bound
+  stations: [],          // GeoJSON features currently loaded for the view
+  reqId: 0,
+  filterPolygon: null,    // { ring: [[lng,lat],...] closed, bbox }
+  filterPolygonLayer: null,
+  drawing: false,
+  drawPoints: [],
+  drawPreviewLayer: null,
+  editing: false,          // true while vertex-edit handles are shown
+  filterVertices: [],      // array of L.LatLng, open ring (no closing dupe) — source of truth while editing
+  vertexMarkers: [],
+  midpointMarkers: [],
+  siteTypes: new Set(), // which WQP siteType values to show on the map AND include in downloads; seeded from real data on first load (see discoverSiteTypesFrom)
+};
+
+/* ============================== small helpers ============================== */
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, ms = 4200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
+}
+function debounce(fn, wait) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+function looksLikeUrl(v) { return typeof v === 'string' && /^https?:\/\/\S+$/i.test(v.trim()); }
+
+/* Minimal RFC-4180-ish CSV parser/serializer — needed because we filter WQP's
+   CSV rows client-side (by lat/lon) before re-writing them, and a naive
+   split(',')/split('\n') breaks on quoted fields containing commas or
+   embedded newlines, which water-quality comment fields regularly have. */
+function parseCsvRows(text) {
+  const rows = [];
+  let field = '', row = [], inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\r') { /* skip; \n (or lone \r) below ends the row */ }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function csvField(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvRowStr(fields) { return fields.map(csvField).join(','); }
+function popupHtml(props) {
+  const rows = Object.entries(props || {}).slice(0, 60)
+    .map(([k, v]) => {
+      const cell = looksLikeUrl(v) ? `<a href="${esc(v.trim())}" target="_blank" rel="noopener noreferrer">${esc(v.trim())}</a>` : esc(v);
+      return `<tr><td>${esc(k)}</td><td>${cell}</td></tr>`;
+    }).join('');
+  return `<table class="attrs">${rows || '<tr><td>(no attributes)</td></tr>'}</table>`;
+}
+
+/* ============================== rate-limit-safe fetch ============================== */
+const HOST_MAX_CONCURRENCY = 2;
+const HOST_MIN_GAP_MS = 150;
+const hostState = new Map();
+function hostKeyOf(u) { try { return new URL(u, location.href).host; } catch { return 'unknown'; } }
+function pumpHost(st) { while (st.active < HOST_MAX_CONCURRENCY && st.queue.length) { st.active++; st.queue.shift()(); } }
+function scheduleOnHost(url, task) {
+  const key = hostKeyOf(url);
+  let st = hostState.get(key);
+  if (!st) { st = { active: 0, queue: [], lastAt: 0 }; hostState.set(key, st); }
+  return new Promise((resolve, reject) => {
+    st.queue.push(() => {
+      const wait = Math.max(0, HOST_MIN_GAP_MS - (Date.now() - st.lastAt));
+      setTimeout(() => {
+        st.lastAt = Date.now();
+        task().then(r => { st.active--; pumpHost(st); resolve(r); }, e => { st.active--; pumpHost(st); reject(e); });
+      }, wait);
+    });
+    pumpHost(st);
+  });
+}
+async function rawFetchWithRetry(url, options, attempt) {
+  attempt = attempt || 0;
+  const r = await fetch(url, options);
+  if (r.status === 429 && attempt < 4) {
+    const ra = r.headers.get('Retry-After');
+    const delay = ra && !isNaN(+ra) ? (+ra) * 1000 : Math.min(8000, 700 * Math.pow(2, attempt));
+    await new Promise(res => setTimeout(res, delay));
+    return rawFetchWithRetry(url, options, attempt + 1);
+  }
+  // 502/503/504 are usually a transient gateway hiccup rather than a
+  // persistent problem with the request — worth one or two quick retries
+  // before giving up (callers that need finer-grained recovery, like the
+  // batch/spatial downloads, layer their own adaptive splitting on top).
+  if ((r.status === 502 || r.status === 503 || r.status === 504) && attempt < 2) {
+    await new Promise(res => setTimeout(res, Math.min(4000, 1000 * Math.pow(2, attempt))));
+    return rawFetchWithRetry(url, options, attempt + 1);
+  }
+  return r;
+}
+function fetchLimited(url, options) { return scheduleOnHost(url, () => rawFetchWithRetry(url, options)); }
+// Some sandboxed preview environments proxy fetch() through postMessage,
+// which can't structured-clone an AbortSignal — passing `signal` in fetch
+// options throws there. So timeouts are done as a soft race instead of via
+// AbortController/AbortSignal; the underlying request may keep running in
+// the background, but callers stop waiting and treat it as failed.
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      const err = new Error((label || 'request') + ' timed out');
+      err.name = 'TimeoutError';
+      reject(err);
+    }, ms);
+    promise.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+  });
+}
+async function httpErrorMessage(r) {
+  let extra = '';
+  try {
+    let raw = (await r.text()).trim();
+    // Gateway-level errors (502/504 especially) often come back as an HTML
+    // error page rather than plain text — strip tags so the toast shows
+    // readable text instead of markup soup.
+    if (/<[a-z][\s\S]*>/i.test(raw.slice(0, 100))) raw = raw.replace(/<[^>]*>/g, ' ');
+    extra = raw.replace(/\s+/g, ' ').trim().slice(0, 200);
+  } catch (_) { /* body already consumed or unreadable */ }
+  if (r.status === 429) return `rate-limited (HTTP 429)${extra ? ' — ' + extra : ''} — please wait a moment and try again`;
+  if (r.status === 502) return `WQP's gateway had a hiccup (HTTP 502)${extra ? ' — ' + extra : ''} — this is usually transient, try again in a moment`;
+  if (r.status === 503) return `server temporarily unavailable (HTTP 503)${extra ? ' — ' + extra : ''}`;
+  if (r.status === 504) return `WQP's gateway timed out (HTTP 504)${extra ? ' — ' + extra : ''} — the query was likely too large; try a smaller area or a narrower date range`;
+  return `HTTP ${r.status}${extra ? ' — ' + extra : ''}`;
+}
+const CACHE_TTL_DATA = 3 * 60 * 1000;
+const respCache = new Map();
+function cachedCall(key, ttlMs, factory) {
+  const hit = respCache.get(key);
+  if (hit && (Date.now() - hit.at) < hit.ttl) return hit.promise;
+  const p = factory().catch(e => { respCache.delete(key); throw e; });
+  respCache.set(key, { at: Date.now(), ttl: ttlMs, promise: p });
+  return p;
+}
+
+/* ============================== bbox helpers ============================== */
+const NM_BBOX = { minLon: -109.15, minLat: 31.25, maxLon: -102.9, maxLat: 37.1 };
+function bboxIntersect(a, b) {
+  if (!a) return b; if (!b) return a;
+  const minLon = Math.max(a.minLon, b.minLon), minLat = Math.max(a.minLat, b.minLat);
+  const maxLon = Math.min(a.maxLon, b.maxLon), maxLat = Math.min(a.maxLat, b.maxLat);
+  return (minLon >= maxLon || minLat >= maxLat) ? null : { minLon, minLat, maxLon, maxLat };
+}
+function mapViewBbox() {
+  const b = state.map.getBounds();
+  return { minLon: b.getWest(), minLat: b.getSouth(), maxLon: b.getEast(), maxLat: b.getNorth() };
+}
+function queryBboxForView() { return bboxIntersect(mapViewBbox(), NM_BBOX); }
+function ptInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function ringBbox(ring) {
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+  for (const [lng, lat] of ring) { minLon = Math.min(minLon, lng); maxLon = Math.max(maxLon, lng); minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat); }
+  return { minLon, minLat, maxLon, maxLat };
+}
+function stationInFilter(feature) {
+  if (!state.filterPolygon) return true;
+  const c = feature.geometry && feature.geometry.coordinates;
+  if (!c) return false;
+  return ptInRing(c[0], c[1], state.filterPolygon.ring);
+}
+
+/* ============================== WQP ============================== */
+const WQP_STATION_URL = 'https://www.waterqualitydata.us/data/Station/search';
+const WQP_RESULT_URL = 'https://www.waterqualitydata.us/data/Result/search';
+const WQP_SUMMARY_URL = 'https://www.waterqualitydata.us/data/summary/monitoringLocation/search';
+const WQP_NM_STATECODE = 'US:35';
+
+async function fetchWqpStations(bbox) {
+  const u = new URL(WQP_STATION_URL);
+  u.searchParams.set('statecode', WQP_NM_STATECODE);
+  u.searchParams.set('mimeType', 'geojson');
+  u.searchParams.set('zip', 'no');
+  if (bbox) u.searchParams.set('bBox', `${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}`);
+  return cachedCall('wqp:' + u.toString(), CACHE_TTL_DATA, async () => {
+    const r = await withTimeout(fetchLimited(u), 30000, 'station lookup');
+    if (!r.ok) throw new Error(await httpErrorMessage(r));
+    const j = await r.json();
+    if (!j.features) throw new Error('unexpected WQP response (no features array)');
+    return j;
+  });
+}
+function wqpPopupHtml(feature) {
+  const p = feature.properties || {};
+  const siteId = p.MonitoringLocationIdentifier || '';
+  let html = popupHtml(p);
+  if (siteId) {
+    const browseUrl = 'https://www.waterqualitydata.us/#siteid=' + encodeURIComponent(siteId) + '&mimeType=csv';
+    const csvUrl = WQP_RESULT_URL + '?siteid=' + encodeURIComponent(siteId) + '&mimeType=csv&zip=no';
+    html += `<div class="popup-links">
+      <a href="${esc(browseUrl)}" target="_blank" rel="noopener">Browse on WQP ↗</a>
+      <a href="${esc(csvUrl)}" target="_blank" rel="noopener">Download CSV ↗</a>
+    </div>`;
+  }
+  return html;
+}
+
+/* ============================== map + loading ============================== */
+// Single source of truth for which site types are enabled — used for BOTH
+// map visibility (query + display) and downloads. Toggling from either the
+// header popover or the legend updates state.siteTypes and keeps both UIs
+// (and the map) in sync.
+function setSiteTypeEnabled(type, enabled) {
+  if (enabled) state.siteTypes.add(type); else state.siteTypes.delete(type);
+  renderSiteTypeLists();
+  refreshVisibleLayer();
+}
+function setAllSiteTypes(enabled) {
+  state.siteTypes = enabled ? new Set(allKnownSiteTypes()) : new Set();
+  renderSiteTypeLists();
+  refreshVisibleLayer();
+}
+// Re-renders the map layer and panel from whatever's already loaded in
+// state.stations — no network call. Used whenever site-type visibility
+// changes, so toggling a checkbox is instant.
+function refreshVisibleLayer() {
+  if (!state.layer) return;
+  const visible = visibleStations();
+  state.layer.clearLayers();
+  state.layer.addData({ type: 'FeatureCollection', features: visible });
+  applyFilterStyling();
+  updatePanel();
+}
+function renderSiteTypeLists() {
+  const waterList = document.getElementById('siteTypeWaterList');
+  const otherList = document.getElementById('siteTypeOtherList');
+  waterList.innerHTML = '';
+  otherList.innerHTML = '';
+  function row(type) {
+    const label = document.createElement('label');
+    label.className = 'stp-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.siteTypes.has(type);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(type));
+    cb.addEventListener('change', () => setSiteTypeEnabled(type, cb.checked));
+    return label;
+  }
+  for (const t of WQP_WATER_SITE_TYPES) waterList.appendChild(row(t));
+  for (const t of WQP_OTHER_SITE_TYPES) otherList.appendChild(row(t));
+}
+/* ============================== parameter summary ============================== */
+// Uses WQP's dedicated summary service (not the full Result service) so we
+// get per-site characteristic-group counts without pulling any actual sample
+// rows — much cheaper than downloading real results just to see what's
+// measured. See: https://www.waterqualitydata.us/webservices_documentation/
+// ("Summary Service"). dataProfile=summaryMonitoringLocation returns one
+// feature per site with a characteristicGroupResultCount object.
+async function fetchParameterSummary(ids, bbox) {
+  const u = new URL(WQP_SUMMARY_URL);
+  u.searchParams.set('mimeType', 'geojson');
+  u.searchParams.set('zip', 'no');
+  u.searchParams.set('dataProfile', 'summaryMonitoringLocation');
+  u.searchParams.set('summaryYears', 'all');
+  u.searchParams.set('sampleMedia', 'Water');
+  if (state.siteTypes.size) u.searchParams.set('siteType', [...state.siteTypes].join(';'));
+  if (ids) {
+    for (const id of ids) u.searchParams.append('siteid', id);
+  } else {
+    u.searchParams.set('statecode', WQP_NM_STATECODE);
+    if (bbox) u.searchParams.set('bBox', `${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}`);
+  }
+  const r = await withTimeout(fetchLimited(u.toString()), 30000, 'parameter summary');
+  if (!r.ok) throw new Error(await httpErrorMessage(r));
+  const j = await r.json();
+  if (!j.features) throw new Error('unexpected summary response (no features array)');
+  return j.features;
+}
+function aggregateCharacteristicGroups(features) {
+  const totals = new Map();
+  let totalResults = 0, totalActivities = 0;
+  for (const f of features) {
+    const p = f.properties || {};
+    totalResults += Number(p.resultCount) || 0;
+    totalActivities += Number(p.activityCount) || 0;
+    const groups = p.characteristicGroupResultCount || {};
+    for (const [g, n] of Object.entries(groups)) totals.set(g, (totals.get(g) || 0) + (Number(n) || 0));
+  }
+  return { totals, totalResults, totalActivities, siteCount: features.length };
+}
+async function loadParameterSummary() {
+  const btn = document.getElementById('loadParamsBtn');
+  const resultsEl = document.getElementById('paramSummaryResults');
+  const stations = state.filterPolygon ? filteredStations() : visibleStations();
+  if (!stations.length) { toast('No monitoring locations to summarize — check at least one site type and make sure stations are loaded.'); return; }
+  const ids = [...new Set(stations.map(f => f.properties && f.properties.MonitoringLocationIdentifier).filter(Boolean))];
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Loading parameters\u2026';
+  resultsEl.innerHTML = '';
+  try {
+    let features, approximate = false;
+    if (ids.length && ids.length <= WQP_GET_SITE_THRESHOLD) {
+      features = await fetchParameterSummary(ids, null);
+    } else {
+      // Too many sites to list individually — summarize by bounding box
+      // instead. For a drawn polygon this is the polygon's rectangle, so it
+      // may include a few sites just outside the exact drawn shape.
+      approximate = true;
+      const bbox = state.filterPolygon ? state.filterPolygon.bbox : queryBboxForView();
+      features = await fetchParameterSummary(null, bbox);
+    }
+    const { totals, totalResults, totalActivities, siteCount } = aggregateCharacteristicGroups(features);
+    if (!totals.size) {
+      resultsEl.innerHTML = '<div class="param-empty">No parameter data found for this selection.</div>';
+    } else {
+      const rows = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+      resultsEl.innerHTML = `
+        <div class="param-meta">${siteCount.toLocaleString()} site${siteCount === 1 ? '' : 's'} summarized (all-time water samples)${approximate ? ' \u2014 approximate, based on the surrounding area' : ''} \u00b7 ${totalResults.toLocaleString()} results \u00b7 ${totalActivities.toLocaleString()} sampling events</div>
+        <div class="param-grid">${rows.map(([g, n]) => `
+          <div class="param-row" title="${esc(g)}"><span class="param-name">${esc(g)}</span><span class="param-count">${n.toLocaleString()}</span></div>`).join('')}
+        </div>`;
+    }
+  } catch (e) {
+    toast('Could not load parameter summary: ' + e.message, 7000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+/* ============================== date range UI ============================== */
+function initDateRangeUI() {
+  const fromInput = document.getElementById('dateFromInput');
+  const toInput = document.getElementById('dateToInput');
+  fromInput.addEventListener('change', () => { state.dateFrom = fromInput.value; });
+  toInput.addEventListener('change', () => { state.dateTo = toInput.value; });
+  document.getElementById('dateRangeClearBtn').onclick = () => {
+    state.dateFrom = ''; state.dateTo = '';
+    fromInput.value = ''; toInput.value = '';
+  };
+  document.getElementById('loadParamsBtn').onclick = () => loadParameterSummary();
+}
+
+/* ============================== basemaps ============================== */
+const BASEMAPS = [
+  { id: 'topo', name: 'Topographic', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attribution: 'Esri', maxZoom: 19 },
+  { id: 'streets', name: 'Streets', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: 'Esri', maxZoom: 19 },
+  { id: 'imagery', name: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: 'Esri', maxZoom: 19 },
+  { id: 'osm', name: 'OpenStreetMap', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '\u00a9 OpenStreetMap contributors', maxZoom: 19 },
+  { id: 'light', name: 'Light (minimal)', url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO', maxZoom: 19, subdomains: 'abcd' },
+];
+function setBasemap(id) {
+  const def = BASEMAPS.find(b => b.id === id) || BASEMAPS[0];
+  if (state.basemapLayer) state.map.removeLayer(state.basemapLayer);
+  const opts = { attribution: def.attribution, maxZoom: def.maxZoom };
+  if (def.subdomains) opts.subdomains = def.subdomains;
+  state.basemapLayer = L.tileLayer(def.url, opts).addTo(state.map);
+  state.basemapId = def.id;
+  renderBasemapList();
+}
+function renderBasemapList() {
+  const list = document.getElementById('basemapList');
+  list.innerHTML = '';
+  for (const b of BASEMAPS) {
+    const label = document.createElement('label');
+    label.className = 'stp-row';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'basemap';
+    radio.checked = state.basemapId === b.id;
+    radio.addEventListener('change', () => setBasemap(b.id));
+    label.appendChild(radio);
+    label.appendChild(document.createTextNode(b.name));
+    list.appendChild(label);
+  }
+}
+function initBasemapUI() {
+  renderBasemapList();
+  const btn = document.getElementById('basemapBtn');
+  const pop = document.getElementById('basemapPopover');
+  btn.onclick = (e) => { e.stopPropagation(); pop.style.display = pop.style.display === 'none' ? '' : 'none'; };
+  document.addEventListener('click', (e) => { if (pop.style.display !== 'none' && !pop.contains(e.target) && e.target !== btn) pop.style.display = 'none'; });
+}
+
+/* ============================== site types UI ============================== */
+function initSiteTypeUI() {
+  renderSiteTypeLists();
+  const btn = document.getElementById('siteTypeBtn');
+  const pop = document.getElementById('siteTypePopover');
+  btn.onclick = (e) => { e.stopPropagation(); pop.style.display = pop.style.display === 'none' ? '' : 'none'; };
+  document.addEventListener('click', (e) => { if (pop.style.display !== 'none' && !pop.contains(e.target) && e.target !== btn) pop.style.display = 'none'; });
+  document.getElementById('siteTypeAllBtn').onclick = () => setAllSiteTypes(true);
+  document.getElementById('siteTypeNoneBtn').onclick = () => setAllSiteTypes(false);
+  document.getElementById('legendAllBtn').onclick = () => setAllSiteTypes(true);
+  document.getElementById('legendNoneBtn').onclick = () => setAllSiteTypes(false);
+  makeDraggable(document.getElementById('legendHandle'), document.getElementById('legendPanel'), 'mapWrap');
+}
+// Lets the user drag a floating panel around by a handle element, constrained
+// to stay within the given wrapper. Uses pointer events so it works for both
+// mouse and touch with a single code path.
+function makeDraggable(handle, panel, wrapId) {
+  let dragging = false, offsetX = 0, offsetY = 0;
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return; // let the All/None buttons work normally
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    const rect = panel.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    panel.style.right = 'auto'; // switch from any right/bottom-anchored default to left/top pixel positioning
+    panel.style.bottom = 'auto';
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const wrap = document.getElementById(wrapId).getBoundingClientRect();
+    let x = e.clientX - offsetX - wrap.left;
+    let y = e.clientY - offsetY - wrap.top;
+    const pw = panel.offsetWidth, ph = panel.offsetHeight;
+    x = Math.max(0, Math.min(x, wrap.width - pw));
+    y = Math.max(0, Math.min(y, wrap.height - ph));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
+  };
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+}
+// Fetches WQP's real site-type list in the background and upgrades from the
+// minimal confirmed-safe default (Stream + Lake/Reservoir/Impoundment) to
+// the full set once confirmed. If it can't be loaded, we fall back to no
+// siteType filter at all (show every type) rather than risk another bad
+// guess causing HTTP 400s.
+function initMap() {
+  const map = L.map('map', { zoomControl: true }).setView([34.4, -106.1], 7);
+  state.map = map;
+  setBasemap(state.basemapId);
+  state.layer = L.geoJSON(null, {
+    pointToLayer: (feature, latlng) => {
+      const c = colorForSiteType(siteTypeOf(feature));
+      return L.circleMarker(latlng, { radius: 5, color: c, weight: 2, fillColor: c, fillOpacity: 0.65 });
+    },
+    onEachFeature: (feature, layer) => layer.bindPopup(wqpPopupHtml(feature), { maxWidth: 340 }),
+  }).addTo(map);
+
+  const debouncedReload = debounce(() => loadForCurrentView(), 500);
+  map.on('moveend', () => { if (!state.drawing) debouncedReload(); });
+  map.on('click', (e) => { if (state.drawing) addDrawPoint(e.latlng); });
+  map.on('dblclick', () => {
+    if (!state.drawing) return;
+    if (state.drawPoints.length > 1) state.drawPoints.pop();
+    if (state.drawPoints.length >= 3) finishDrawing();
+    else { updateDrawPreview(); toast('Need at least 3 points to close the polygon.'); }
+  });
+
+  loadForCurrentView();
+}
+async function loadForCurrentView() {
+  const bbox = queryBboxForView();
+  const myReq = ++state.reqId;
+  if (!bbox) {
+    state.layer.clearLayers(); state.stations = [];
+    updatePanel();
+    toast('Current view is outside New Mexico — pan into the state to load stations.');
+    return;
+  }
+  document.getElementById('loadingBadge').classList.add('show');
+  try {
+    const geojson = await fetchWqpStations(bbox);
+    if (myReq !== state.reqId) return;
+    const features = geojson.features || [];
+    discoverSiteTypesFrom(features); // keeps the known-type list (legend/popover) current; seeds default selection once
+    renderSiteTypeLists();
+    state.stations = features;
+    const visible = features.filter(f => state.siteTypes.has(siteTypeOf(f)));
+    state.layer.clearLayers();
+    state.layer.addData({ type: 'FeatureCollection', features: visible });
+    applyFilterStyling();
+    updatePanel();
+  } catch (e) {
+    if (myReq !== state.reqId) return;
+    toast('Could not load monitoring locations: ' + e.message);
+  } finally {
+    if (myReq === state.reqId) document.getElementById('loadingBadge').classList.remove('show');
+  }
+}
+
+/* ============================== filter visibility ============================== */
+function applyFilterStyling() {
+  state.layer.eachLayer(child => {
+    if (!child.feature || !child.setStyle) return;
+    const inFilter = stationInFilter(child.feature);
+    const c = colorForSiteType(siteTypeOf(child.feature));
+    child.setStyle(inFilter
+      ? { radius: 5, color: c, weight: 2, fillColor: c, fillOpacity: 0.65, opacity: 1 }
+      : { radius: 5, color: c, weight: 1.5, fillColor: c, fillOpacity: 0.08, opacity: 0.25 });
+  });
+}
+// state.stations holds every station loaded for the view, regardless of
+// which types are enabled (so the legend can show true counts even for
+// hidden types). visibleStations() is the type-enabled subset actually
+// shown on the map and eligible for filtering/downloads.
+function visibleStations() { return state.stations.filter(f => state.siteTypes.has(siteTypeOf(f))); }
+function filteredStations() { return visibleStations().filter(stationInFilter); }
+function updatePanel() {
+  document.getElementById('statTotal').textContent = visibleStations().length.toLocaleString();
+  const hasFilter = !!state.filterPolygon;
+  document.getElementById('statFilteredRow').style.display = hasFilter ? '' : 'none';
+  document.getElementById('downloadBtn').style.display = hasFilter ? '' : 'none';
+  document.getElementById('clearFilterLink').style.display = hasFilter ? '' : 'none';
+  if (hasFilter) document.getElementById('statFiltered').textContent = filteredStations().length.toLocaleString();
+  updateLegend();
+}
+function updateLegend() {
+  const counts = new Map();
+  for (const f of state.stations) {
+    const t = siteTypeOf(f);
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  const panel = document.getElementById('legendPanel');
+  const grid = document.getElementById('legendGrid');
+  const known = allKnownSiteTypes();
+  // Union of every known type plus anything unexpected that showed up in the
+  // data, so the checklist never silently hides a type.
+  const allTypes = [...new Set([...known, ...counts.keys()])];
+  if (!allTypes.length) { panel.style.display = 'none'; grid.innerHTML = ''; return; }
+  panel.style.display = '';
+  allTypes.sort((a, b) => (counts.get(b) || 0) - (counts.get(a) || 0) || a.localeCompare(b));
+  grid.innerHTML = allTypes.map((type) => `
+      <label class="legend-row" title="${esc(type)}">
+        <input type="checkbox" data-legend-type="${esc(type)}" ${state.siteTypes.has(type) ? 'checked' : ''}>
+        <span class="legend-swatch" style="background:${esc(colorForSiteType(type))}"></span>
+        <span class="legend-name">${esc(type)}</span>
+        <span class="legend-count">${(counts.get(type) || 0).toLocaleString()}</span>
+      </label>`).join('');
+  grid.querySelectorAll('input[data-legend-type]').forEach(cb => {
+    cb.addEventListener('change', () => setSiteTypeEnabled(cb.getAttribute('data-legend-type'), cb.checked));
+  });
+}
+
+/* ============================== draw-a-filter-polygon UI ============================== */
+function updateDrawPreview() {
+  if (state.drawPreviewLayer) { state.map.removeLayer(state.drawPreviewLayer); state.drawPreviewLayer = null; }
+  if (state.drawPoints.length) {
+    const group = L.featureGroup();
+    L.polyline(state.drawPoints, { color: '#ff6600', weight: 2, dashArray: '5 4', interactive: false }).addTo(group);
+    for (const p of state.drawPoints) L.circleMarker(p, { radius: 4, color: '#ff6600', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false }).addTo(group);
+    group.addTo(state.map);
+    state.drawPreviewLayer = group;
+  }
+  document.getElementById('drawFinishBtn').disabled = state.drawPoints.length < 3;
+  document.getElementById('drawUndoBtn').disabled = state.drawPoints.length === 0;
+}
+function addDrawPoint(latlng) { state.drawPoints.push(latlng); updateDrawPreview(); }
+function undoDrawPoint() { state.drawPoints.pop(); updateDrawPreview(); }
+function startDrawing() {
+  clearFilter();
+  state.drawing = true;
+  state.drawPoints = [];
+  state.map.doubleClickZoom.disable();
+  document.getElementById('drawFilterBtn').style.display = 'none';
+  document.getElementById('drawControls').style.display = 'inline-flex';
+  updateDrawPreview();
+  updateHintText();
+  toast('Click the map to place points, then Finish (or double-click) — 3+ points needed.');
+}
+function stopDrawingUI() {
+  state.drawing = false;
+  state.map.doubleClickZoom.enable();
+  if (state.drawPreviewLayer) { state.map.removeLayer(state.drawPreviewLayer); state.drawPreviewLayer = null; }
+  state.drawPoints = [];
+  document.getElementById('drawControls').style.display = 'none';
+  if (!state.filterPolygon) document.getElementById('drawFilterBtn').style.display = '';
+}
+function cancelDrawing() { stopDrawingUI(); }
+function finishDrawing() {
+  if (state.drawPoints.length < 3) return;
+  state.filterVertices = state.drawPoints.slice();
+  state.filterPolygonLayer = L.polygon(state.filterVertices, { color: '#ff6600', weight: 2, dashArray: '6 4', fillOpacity: 0.05, fillColor: '#ff6600', interactive: false }).addTo(state.map);
+  syncFilterPolygonFromVertices();
+  stopDrawingUI();
+  enterEditMode();
+  toast('Filter applied — drag the orange handles to reshape it, or click the small dots to add a point.', 6000);
+}
+function clearFilter() {
+  const had = !!state.filterPolygon;
+  exitEditMode();
+  state.filterPolygon = null;
+  state.filterVertices = [];
+  if (state.filterPolygonLayer) { state.map.removeLayer(state.filterPolygonLayer); state.filterPolygonLayer = null; }
+  document.getElementById('editControls').style.display = 'none';
+  document.getElementById('drawFilterBtn').style.display = '';
+  if (had) { applyFilterStyling(); updatePanel(); updateHintText(); }
+}
+
+/* ---- vertex editing ---- */
+function syncFilterPolygonFromVertices() {
+  const ring = state.filterVertices.map(p => [p.lng, p.lat]);
+  ring.push(ring[0]);
+  state.filterPolygon = { ring, bbox: ringBbox(ring) };
+  if (state.filterPolygonLayer) state.filterPolygonLayer.setLatLngs(state.filterVertices);
+  applyFilterStyling();
+  updatePanel();
+}
+function vertexIcon() { return L.divIcon({ className: 'vertex-handle', iconSize: [14, 14], iconAnchor: [7, 7] }); }
+function midpointIcon() { return L.divIcon({ className: 'midpoint-handle', iconSize: [9, 9], iconAnchor: [4, 4] }); }
+function makeVertexMarker(latlng, index) {
+  const m = L.marker(latlng, { icon: vertexIcon(), draggable: true, keyboard: false, zIndexOffset: 1000 });
+  m.on('drag', () => { state.filterVertices[index] = m.getLatLng(); syncFilterPolygonFromVertices(); repositionMidpoints(); });
+  m.on('dblclick', (e) => { L.DomEvent.stop(e); removeVertex(index); });
+  m.bindTooltip('Drag to move · double-click to remove', { direction: 'top', offset: [0, -8] });
+  m.addTo(state.map);
+  return m;
+}
+function makeMidpointMarker(latlng, edgeIndex) {
+  const m = L.marker(latlng, { icon: midpointIcon(), draggable: false, keyboard: false, zIndexOffset: 900 });
+  m.on('click', (e) => { L.DomEvent.stop(e); insertVertexAtEdge(edgeIndex, m.getLatLng()); });
+  m.bindTooltip('Click to add a point here', { direction: 'top', offset: [0, -6] });
+  m.addTo(state.map);
+  return m;
+}
+function repositionMidpoints() {
+  const n = state.filterVertices.length;
+  for (let i = 0; i < n; i++) {
+    const a = state.filterVertices[i], b = state.filterVertices[(i + 1) % n];
+    const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+    if (state.midpointMarkers[i]) state.midpointMarkers[i].setLatLng(mid);
+  }
+}
+function buildEditHandles() {
+  clearEditHandles();
+  const n = state.filterVertices.length;
+  state.vertexMarkers = state.filterVertices.map((latlng, i) => makeVertexMarker(latlng, i));
+  state.midpointMarkers = [];
+  for (let i = 0; i < n; i++) {
+    const a = state.filterVertices[i], b = state.filterVertices[(i + 1) % n];
+    const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+    state.midpointMarkers.push(makeMidpointMarker(mid, i));
+  }
+}
+function clearEditHandles() {
+  for (const m of state.vertexMarkers) state.map.removeLayer(m);
+  for (const m of state.midpointMarkers) state.map.removeLayer(m);
+  state.vertexMarkers = [];
+  state.midpointMarkers = [];
+}
+function insertVertexAtEdge(edgeIndex, latlng) {
+  state.filterVertices.splice(edgeIndex + 1, 0, latlng);
+  syncFilterPolygonFromVertices();
+  buildEditHandles();
+}
+function removeVertex(index) {
+  if (state.filterVertices.length <= 3) { toast('A filter polygon needs at least 3 points.'); return; }
+  state.filterVertices.splice(index, 1);
+  syncFilterPolygonFromVertices();
+  buildEditHandles();
+}
+function enterEditMode() {
+  state.editing = true;
+  buildEditHandles();
+  document.getElementById('drawFilterBtn').style.display = 'none';
+  document.getElementById('editControls').style.display = 'inline-flex';
+  document.getElementById('editToggleBtn').textContent = '✓ Done editing';
+  updateHintText();
+}
+function exitEditMode() {
+  state.editing = false;
+  clearEditHandles();
+  if (state.filterPolygon) {
+    document.getElementById('editControls').style.display = 'inline-flex';
+    document.getElementById('editToggleBtn').textContent = '✎ Edit filter';
+  }
+  updateHintText();
+}
+function toggleEditMode() { if (state.editing) exitEditMode(); else enterEditMode(); }
+function updateHintText() {
+  const el = document.getElementById('hintText');
+  if (state.drawing) el.textContent = 'Click the map to place points, then Finish (or double-click) — 3+ points needed. Esc to cancel.';
+  else if (state.editing) el.textContent = 'Drag orange handles to reshape the filter. Click a small dot to add a point; double-click a handle to remove it. Esc or "Done editing" when finished.';
+  else if (state.filterPolygon) el.textContent = 'Filter applied. Click "Edit filter" to reshape it, or download the CSV for stations inside it.';
+  else el.textContent = 'Pan and zoom to load stations for the visible area. Draw a polygon (Finish or double-click to close) to select a subset, then download all of their water-sample results as one CSV.';
+}
+
+/* ============================== CSV download ============================== */
+// WQP's GET endpoint (siteid repeated as query params) breaks down on very long
+// URLs — this is WQP's own documented limit, not one we impose. Below this
+// threshold we use the old fast path (browser navigates straight to WQP, no
+// fetch/CORS involved). Above it we switch to WQP's documented POST-with-JSON
+// workaround for large site lists, streamed back as a blob and saved locally.
+// See: https://www.waterqualitydata.us/webservices_documentation/ ("Queries Using POST")
+const WQP_GET_SITE_THRESHOLD = 150;
+// Above this many sites, per-site batching itself becomes the bottleneck
+// (tens of thousands of sites = thousands of requests). Past this point we
+// stop enumerating site IDs and query WQP by location (bBox) + date range
+// instead — the same shape of query the station search already uses — then
+// filter rows against the exact drawn polygon client-side.
+const WQP_SPATIAL_THRESHOLD = 1000;
+let streamCancelRequested = false;
+
+function csvFilename(n) {
+  return `wqp-results-${n}sites-${new Date().toISOString().slice(0, 10)}.csv`;
+}
+
+// YYYY-MM-DD (from <input type=date>) -> WQP's MM-DD-YYYY format.
+function inputDateToWqp(yyyyMmDd) {
+  const [y, m, d] = yyyyMmDd.split('-');
+  return `${m}-${d}-${y}`;
+}
+// Applies the user's chosen date range (if any) to a Result-search URL.
+function applyDateRangeParams(u) {
+  if (state.dateFrom) u.searchParams.set('startDateLo', inputDateToWqp(state.dateFrom));
+  if (state.dateTo) u.searchParams.set('startDateHi', inputDateToWqp(state.dateTo));
+}
+
+function downloadViaGet(ids) {
+  const u = new URL(WQP_RESULT_URL);
+  for (const id of ids) u.searchParams.append('siteid', id);
+  u.searchParams.set('mimeType', 'csv');
+  u.searchParams.set('zip', 'no');
+  u.searchParams.set('sampleMedia', 'Water');
+  applyDateRangeParams(u);
+  toast(`Requesting water-sample results for ${ids.length.toLocaleString()} monitoring location${ids.length === 1 ? '' : 's'} — opens/downloads directly from WQP.`, 6000);
+  window.open(u.toString(), '_blank');
+}
+
+// A single POST batch. Throws with `.status` set on HTTP failure so callers
+// can decide whether it's worth splitting the batch and retrying.
+async function fetchResultCsvBatch(ids) {
+  const u = new URL(WQP_RESULT_URL);
+  u.searchParams.set('mimeType', 'csv');
+  u.searchParams.set('zip', 'no');
+  u.searchParams.set('sampleMedia', 'Water');
+  applyDateRangeParams(u);
+  u.searchParams.set('sorted', 'no'); // faster for large downloads; we sort/merge client-side anyway
+  let r;
+  try {
+    r = await withTimeout(fetchLimited(u.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteid: ids }),
+    }), 90000, 'batch download');
+  } catch (e) {
+    const err = new Error(e.name === 'TimeoutError' || e.name === 'AbortError' ? 'request timed out' : e.message);
+    err.retryable = true;
+    throw err;
+  }
+  if (!r.ok) {
+    const err = new Error(await httpErrorMessage(r));
+    err.status = r.status;
+    err.retryable = r.status === 502 || r.status === 503 || r.status === 504;
+    throw err;
+  }
+  return r.text();
+}
+
+// A 504/502/503 (or client-side timeout) on a batch usually means the batch's
+// result set was too big for WQP's gateway to assemble in time — not that the
+// data doesn't exist. So on a retryable failure we split the batch in half and
+// try each half independently, recursing down to MIN_BATCH before giving up
+// on that slice of sites (which gets reported to the user, not silently dropped).
+const MIN_BATCH = 4;
+async function fetchResultCsvAdaptive(ids, onBatchDone) {
+  try {
+    const csv = await fetchResultCsvBatch(ids);
+    onBatchDone(ids.length);
+    return [{ ids, csv }];
+  } catch (e) {
+    if (e.retryable && ids.length > MIN_BATCH) {
+      const mid = Math.ceil(ids.length / 2);
+      const [left, right] = await Promise.all([
+        fetchResultCsvAdaptive(ids.slice(0, mid), onBatchDone),
+        fetchResultCsvAdaptive(ids.slice(mid), onBatchDone),
+      ]);
+      return [...left, ...right];
+    }
+    onBatchDone(ids.length);
+    return [{ ids, csv: null, error: e.message }];
+  }
+}
+
+// WQP repeats the CSV header on every response; keep the first, drop the rest.
+function mergeCsvBatches(batches) {
+  let header = null;
+  const lines = [];
+  for (const b of batches) {
+    if (!b.csv) continue;
+    const rows = b.csv.split(/\r\n|\n/);
+    while (rows.length && rows[rows.length - 1] === '') rows.pop();
+    if (!rows.length) continue;
+    if (header === null) { header = rows[0]; lines.push(...rows); }
+    else lines.push(...rows.slice(1));
+  }
+  return lines.join('\n');
+}
+
+const WQP_POST_BATCH_SIZE = 25; // sites per initial request; halved further on 504/timeout
+
+async function downloadViaPost(ids, btn) {
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  const batches = [];
+  for (let i = 0; i < ids.length; i += WQP_POST_BATCH_SIZE) batches.push(ids.slice(i, i + WQP_POST_BATCH_SIZE));
+  toast(`Requesting water-sample results for ${ids.length.toLocaleString()} monitoring locations in ${batches.length} batch${batches.length === 1 ? '' : 'es'} — large selections can take a while, and WQP's server may split slow batches further.`, 8000);
+
+  let sitesDone = 0;
+  const onBatchDone = (n) => {
+    sitesDone += n;
+    btn.textContent = `Fetching… (${Math.min(sitesDone, ids.length).toLocaleString()}/${ids.length.toLocaleString()} sites)`;
+  };
+
+  try {
+    const results = await Promise.all(batches.map(b => fetchResultCsvAdaptive(b, onBatchDone)));
+    const allBatches = results.flat();
+    const failed = allBatches.filter(b => b.error);
+    const failedSiteCount = failed.reduce((n, b) => n + b.ids.length, 0);
+    const csv = mergeCsvBatches(allBatches);
+
+    if (!csv) {
+      toast('Could not download results — WQP kept timing out even on small batches. Try again in a bit, or narrow the polygon.', 8000);
+      return;
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = csvFilename(ids.length - failedSiteCount);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+
+    if (failedSiteCount) {
+      toast(`Downloaded water-sample results for ${(ids.length - failedSiteCount).toLocaleString()} of ${ids.length.toLocaleString()} sites. ${failedSiteCount.toLocaleString()} site${failedSiteCount === 1 ? '' : 's'} kept timing out even in small batches and were skipped — try again later, or shrink the polygon to pick them up.`, 9000);
+    } else {
+      toast(`Downloaded water-sample results for all ${ids.length.toLocaleString()} monitoring locations.`, 5000);
+    }
+  } catch (e) {
+    toast('Could not download results: ' + e.message, 7000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+function allKnownSiteTypes() { return [...WQP_WATER_SITE_TYPES, ...WQP_OTHER_SITE_TYPES]; }
+
+/* ---- large-area download: bBox + date-range query, streamed to disk ---- */
+function dateToWqp(d) {
+  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}-${d.getUTCFullYear()}`;
+}
+function initialDateChunks(loDate, hiDate, stepYears) {
+  const chunks = [];
+  let y = loDate.getUTCFullYear();
+  const hiYear = hiDate.getUTCFullYear();
+  while (y <= hiYear) {
+    const chunkHiYear = Math.min(y + stepYears - 1, hiYear);
+    const lo = (y === loDate.getUTCFullYear()) ? loDate : new Date(Date.UTC(y, 0, 1));
+    const hi = (chunkHiYear === hiYear) ? hiDate : new Date(Date.UTC(chunkHiYear, 11, 31));
+    chunks.push([lo, hi]);
+    y = chunkHiYear + 1;
+  }
+  return chunks;
+}
+async function fetchSpatialBatch(bbox, lo, hi) {
+  const u = new URL(WQP_RESULT_URL);
+  u.searchParams.set('statecode', WQP_NM_STATECODE);
+  u.searchParams.set('bBox', `${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}`);
+  u.searchParams.set('mimeType', 'csv');
+  u.searchParams.set('zip', 'no');
+  u.searchParams.set('sampleMedia', 'Water');
+  if (state.siteTypes.size) u.searchParams.set('siteType', [...state.siteTypes].join(';'));
+  u.searchParams.set('sorted', 'no');
+  u.searchParams.set('startDateLo', dateToWqp(lo));
+  u.searchParams.set('startDateHi', dateToWqp(hi));
+  let r;
+  try {
+    r = await withTimeout(fetchLimited(u.toString()), 100000, 'date-range batch');
+  } catch (e) {
+    const err = new Error(e.name === 'TimeoutError' || e.name === 'AbortError' ? 'request timed out' : e.message);
+    err.retryable = true;
+    throw err;
+  }
+  if (!r.ok) {
+    const err = new Error(await httpErrorMessage(r));
+    err.status = r.status;
+    err.retryable = r.status === 502 || r.status === 503 || r.status === 504;
+    throw err;
+  }
+  return r.text();
+}
+// A 504/502/503 on a date range usually means that slice had too much data
+// for WQP's gateway to assemble in time, not that it's invalid — so on a
+// retryable failure we halve the date range and retry each half, recursing
+// down to MIN_RANGE_DAYS before reporting that slice as unrecoverable.
+const MIN_RANGE_DAYS = 14;
+async function fetchSpatialRangeAdaptive(bbox, lo, hi, onResult) {
+  if (streamCancelRequested) return;
+  try {
+    const text = await fetchSpatialBatch(bbox, lo, hi);
+    await onResult({ ok: true, text });
+  } catch (e) {
+    const spanDays = Math.round((hi - lo) / 86400000);
+    if (e.retryable && spanDays > MIN_RANGE_DAYS && !streamCancelRequested) {
+      const midTime = lo.getTime() + Math.floor(spanDays / 2) * 86400000;
+      const mid = new Date(midTime), midNext = new Date(midTime + 86400000);
+      await Promise.all([
+        fetchSpatialRangeAdaptive(bbox, lo, mid, onResult),
+        fetchSpatialRangeAdaptive(bbox, midNext, hi, onResult),
+      ]);
+    } else {
+      await onResult({ ok: false, lo, hi, error: e.message });
+    }
+  }
+}
+function findLatLonColumns(header) {
+  const norm = header.map(h => h.trim().toLowerCase());
+  let lat = norm.indexOf('monitoringlocationlatitude');
+  let lon = norm.indexOf('monitoringlocationlongitude');
+  if (lat === -1) lat = norm.findIndex(h => h.includes('latitude'));
+  if (lon === -1) lon = norm.findIndex(h => h.includes('longitude'));
+  return [lat, lon];
+}
+
+async function downloadViaSpatialStream(btn) {
+  if (!('showSaveFilePicker' in window)) {
+    toast('Streaming this many results to a file needs Chrome or Edge (the File System Access API isn\u2019t available here). Try again in one of those browsers.', 8000);
+    return;
+  }
+  if (!state.filterPolygon) { toast('Draw a polygon filter first.'); return; }
+  const bbox = state.filterPolygon.bbox, ring = state.filterPolygon.ring;
+  let writable;
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: `wqp-results-drawn-area-${new Date().toISOString().slice(0, 10)}.csv`,
+      types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
+    });
+    writable = await handle.createWritable();
+  } catch (e) {
+    if (e.name === 'AbortError') return; // user closed the save dialog
+    toast('Could not open a file for saving: ' + e.message, 6000);
+    return;
+  }
+
+  streamCancelRequested = false;
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  document.getElementById('stopStreamBtn').style.display = '';
+  toast('Querying WQP by location + date range (water samples only) instead of by site list, and writing results straight to your file as they arrive. This can take a while for a large area — feel free to leave the tab open.', 9000);
+
+  let headerWritten = false, latIdx = -1, lonIdx = -1, rowsWritten = 0, rowsSkippedOutsidePolygon = 0;
+  const failedRanges = [];
+  let writeQueue = Promise.resolve();
+
+  async function handleChunk(res) {
+    if (!res.ok) { if (res.error !== undefined) failedRanges.push(res); btn.textContent = `Streaming\u2026 (${rowsWritten.toLocaleString()} rows saved)`; return; }
+    const rows = parseCsvRows(res.text);
+    if (!rows.length) return;
+    let dataRows;
+    let textOut = '';
+    if (!headerWritten) {
+      [latIdx, lonIdx] = findLatLonColumns(rows[0]);
+      textOut += csvRowStr(rows[0]) + '\r\n';
+      headerWritten = true;
+      dataRows = rows.slice(1);
+    } else {
+      dataRows = rows.slice(1);
+    }
+    for (const r of dataRows) {
+      if (latIdx === -1 || lonIdx === -1) { textOut += csvRowStr(r) + '\r\n'; rowsWritten++; continue; }
+      const lat = parseFloat(r[latIdx]), lon = parseFloat(r[lonIdx]);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && ptInRing(lon, lat, ring)) { textOut += csvRowStr(r) + '\r\n'; rowsWritten++; }
+      else rowsSkippedOutsidePolygon++;
+    }
+    btn.textContent = `Streaming\u2026 (${rowsWritten.toLocaleString()} rows saved)`;
+    if (textOut) { writeQueue = writeQueue.then(() => writable.write(textOut)); await writeQueue; }
+  }
+
+  try {
+    const rangeLo = state.dateFrom ? new Date(state.dateFrom + 'T00:00:00Z') : new Date(Date.UTC(1900, 0, 1));
+    const rangeHi = state.dateTo ? new Date(state.dateTo + 'T00:00:00Z') : new Date(Date.UTC(new Date().getUTCFullYear(), 11, 31));
+    const chunks = initialDateChunks(rangeLo, rangeHi, 10);
+    await Promise.all(chunks.map(([lo, hi]) => fetchSpatialRangeAdaptive(bbox, lo, hi, handleChunk)));
+    await writeQueue;
+    await writable.close();
+    if (streamCancelRequested) {
+      toast(`Stopped early — saved ${rowsWritten.toLocaleString()} rows to your file before you cancelled.`, 7000);
+    } else if (failedRanges.length) {
+      toast(`Done — saved ${rowsWritten.toLocaleString()} rows. ${failedRanges.length} date range${failedRanges.length === 1 ? '' : 's'} kept timing out even at ${MIN_RANGE_DAYS}-day granularity and were skipped; try again later if you need those.`, 10000);
+    } else {
+      toast(`Done — saved ${rowsWritten.toLocaleString()} rows for the drawn area to your file.`, 6000);
+    }
+  } catch (e) {
+    toast('Download failed: ' + e.message + ` (${rowsWritten.toLocaleString()} rows were saved before the error).`, 8000);
+    try { await writable.close(); } catch (_) { /* already closed/errored */ }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    document.getElementById('stopStreamBtn').style.display = 'none';
+  }
+}
+
+function downloadCsvForFiltered() {
+  const stations = state.filterPolygon ? filteredStations() : visibleStations();
+  if (!stations.length) { toast('No monitoring locations to download results for.'); return; }
+  const ids = [...new Set(stations.map(f => f.properties && f.properties.MonitoringLocationIdentifier).filter(Boolean))];
+  if (!ids.length) { toast('Could not find site IDs on the selected stations.'); return; }
+  const btn = document.getElementById('downloadBtn');
+  if (ids.length <= WQP_GET_SITE_THRESHOLD) downloadViaGet(ids);
+  else if (ids.length <= WQP_SPATIAL_THRESHOLD) downloadViaPost(ids, btn);
+  else downloadViaSpatialStream(btn);
+}
+
+/* ============================== wire up ============================== */
+document.getElementById('drawFilterBtn').onclick = () => { if (!state.drawing) startDrawing(); };
+document.getElementById('drawFinishBtn').onclick = () => finishDrawing();
+document.getElementById('drawUndoBtn').onclick = () => undoDrawPoint();
+document.getElementById('drawCancelBtn').onclick = () => cancelDrawing();
+document.getElementById('editToggleBtn').onclick = () => toggleEditMode();
+document.getElementById('downloadBtn').onclick = () => downloadCsvForFiltered();
+document.getElementById('stopStreamBtn').onclick = () => { streamCancelRequested = true; };
+document.getElementById('clearFilterLink').onclick = () => clearFilter();
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (state.drawing) cancelDrawing();
+  else if (state.editing) exitEditMode();
+});
+
+initSiteTypeUI();
+initBasemapUI();
+initDateRangeUI();
+initMap();
+</script>
+</body>
+</html>
